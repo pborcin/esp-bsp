@@ -9,4 +9,5 @@ idf_component_register(
     SRCS "esp32_s3_korvo_1.c" ${SRC_VER}
     INCLUDE_DIRS "include"
     PRIV_INCLUDE_DIRS "priv_include"
+    REQUIRES spiffs
 )

@@ -18,9 +18,12 @@
  *  ESP32-S3-Korvo-1 pinout
  **************************************************************************************************/
 
-/* Light */
-#define BSP_RGB_CTRL          (GPIO_NUM_19)
-#define BSP_RGB_LEDS_NUM      (12)
+/* Leds */
+#define BSP_LED_RGB_IO          (GPIO_NUM_19)
+#define BSP_RGB_LEDS_NUM        (12)
+
+/* Buttons */
+#define BSP_BUTTONS_IO          (GPIO_NUM_8) // All 6 buttons mapped to this GPIO
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,6 +50,16 @@ typedef enum {
     BSP_BUTTON_NUM,
 } bsp_button_t;
 
+/**************************************************************************************************
+ *
+ * ADC interface
+ *
+ * There are multiple devices connected to ADC peripheral:
+ *  - Buttons
+ *
+ * After initialization of ADC, use adc_handle when using ADC driver.
+ **************************************************************************************************/
+
 #define BSP_ADC_UNIT     ADC_UNIT_1
 
 /**
@@ -59,7 +72,7 @@ typedef enum {
 esp_err_t bsp_adc_initialize(void);
 
 
-// #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
 /**
  * @brief Get ADC handle
  *
@@ -68,7 +81,7 @@ esp_err_t bsp_adc_initialize(void);
  * @return ADC handle
  */
 adc_oneshot_unit_handle_t bsp_adc_get_handle(void);
-// #endif
+#endif
 
 /**
  * @brief Initialize all buttons

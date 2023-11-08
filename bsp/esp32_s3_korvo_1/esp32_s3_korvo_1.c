@@ -23,7 +23,7 @@ static led_strip_handle_t led_strip;
  * This configuration is used by default in bsp_led_init()
  */
 static const led_strip_config_t bsp_strip_config = {
-    .strip_gpio_num = BSP_RGB_CTRL,
+    .strip_gpio_num = BSP_LED_RGB_IO,
     .max_leds = BSP_RGB_LEDS_NUM,
     .led_pixel_format = LED_PIXEL_FORMAT_GRB,
     .led_model = LED_MODEL_WS2812,
@@ -31,9 +31,13 @@ static const led_strip_config_t bsp_strip_config = {
 };
 
 static const led_strip_rmt_config_t bsp_rmt_config = {
+#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
+    .rmt_channel = 0,
+#else
     .clk_src = RMT_CLK_SRC_DEFAULT,
     .resolution_hz = 10 * 1000 * 1000,
     .flags.with_dma = false,
+#endif
 };
 
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)

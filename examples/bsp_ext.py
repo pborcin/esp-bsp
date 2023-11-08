@@ -55,6 +55,7 @@ def action_extensions(base_actions, project_path=os.getcwd()):
             'esp32_lyrat',
             'esp-box-3',
             'esp32_c3_lcdkit',
+            'esp32_s3_korvo_1',
             }
 
         if bsp == '': return

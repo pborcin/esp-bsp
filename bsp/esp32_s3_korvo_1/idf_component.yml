@@ -1,0 +1,17 @@
+version: "1.0.0"
+description: Board Support Package for esp32_s3_korvo_1
+url: https://github.com/espressif/esp-bsp/tree/master/esp32_s3_korvo_1
+
+targets:
+  - esp32s3
+
+dependencies:
+  idf: ">=4.4.5"
+
+  led_strip:
+    version: "^2"
+    public: true
+
+  button:
+    version: "^2"
+    public: true

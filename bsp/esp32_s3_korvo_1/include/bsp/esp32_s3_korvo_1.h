@@ -13,14 +13,15 @@
 #pragma once
 
 #include "iot_button.h"
+#include "led_indicator.h"
 
 /**************************************************************************************************
  *  ESP32-S3-Korvo-1 pinout
  **************************************************************************************************/
 
 /* Leds */
-#define BSP_LED_RGB_IO          (GPIO_NUM_19)
-#define BSP_RGB_LEDS_NUM        (12)
+#define BSP_LED_RGB_GPIO        (GPIO_NUM_19)
+#define BSP_LED_NUM             (12)
 
 /* Buttons */
 #define BSP_BUTTONS_IO          (GPIO_NUM_8) // All 6 buttons mapped to this GPIO
@@ -28,6 +29,17 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* Default LED effects */
+enum {
+    BSP_LED_ON,
+    BSP_LED_OFF,
+    BSP_LED_BLINK_FAST,
+    BSP_LED_BLINK_SLOW,
+    BSP_LED_BREATHE_FAST,
+    BSP_LED_BREATHE_SLOW,
+    BSP_LED_MAX,
+};
 
 /**************************************************************************************************
  *
@@ -104,29 +116,7 @@ esp_err_t bsp_iot_button_create(button_handle_t btn_array[], int *btn_cnt, int b
  *
  * There's twelve RGB lights on ESP32-S3-Korvo-1:
  **************************************************************************************************/
-
-/**
- * @brief Initialize WS2812
- *
- * @return
- *     - ESP_OK Success
- *     - ESP_ERR_INVALID_ARG Parameter error
- */
-esp_err_t bsp_led_init();
-
-/**
- * @brief Set RGB for a specific pixel
- *
- * @param r: red part of color
- * @param g: green part of color
- * @param b: blue part of color
- *
- * @return
- *      - ESP_OK: Set RGB for a specific pixel successfully
- *      - ESP_ERR_INVALID_ARG: Set RGB for a specific pixel failed because of invalid parameters
- *      - ESP_FAIL: Set RGB for a specific pixel failed because other error occurred
- */
-esp_err_t bsp_led_rgb_set(uint8_t r, uint8_t g, uint8_t b);
+esp_err_t bsp_led_indicator_create(led_indicator_handle_t led_array[], int *led_cnt, int led_array_size);
 
 /**************************************************************************************************
  *

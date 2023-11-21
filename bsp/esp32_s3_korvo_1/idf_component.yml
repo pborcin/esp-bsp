@@ -8,8 +8,8 @@ targets:
 dependencies:
   idf: ">=4.4"
 
-  led_strip:
-    version: "^2"
+  led_indicator:
+    version: "^0.7"
     public: true
 
   button:

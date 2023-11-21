@@ -6,43 +6,26 @@
 
 #include "esp_err.h"
 #include "esp_log.h"
-#include "led_strip.h"
 
 #include "iot_button.h"
 #include "bsp/esp-bsp.h"
 #include "bsp_err_check.h"
 #include "esp_spiffs.h"
+#include "led_indicator.h"
 
 static const char *TAG = "S3-Korvo-1";
-
-static led_strip_handle_t led_strip;
 
 /**
  * @brief led configuration structure
  *
  * This configuration is used by default in bsp_led_init()
  */
-static const led_strip_config_t bsp_strip_config = {
-    .strip_gpio_num = BSP_LED_RGB_IO,
-    .max_leds = BSP_RGB_LEDS_NUM,
-    .led_pixel_format = LED_PIXEL_FORMAT_GRB,
-    .led_model = LED_MODEL_WS2812,
-    .flags.invert_out = false,
-};
-
-static const led_strip_rmt_config_t bsp_rmt_config = {
-#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
-    .rmt_channel = 0,
-#else
-    .clk_src = RMT_CLK_SRC_DEFAULT,
-    .resolution_hz = 10 * 1000 * 1000,
-    .flags.with_dma = false,
-#endif
-};
 
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
 static adc_oneshot_unit_handle_t bsp_adc_handle = NULL;
 #endif
+
+extern blink_step_t const *bsp_led_blink_defaults_lists[];
 
 static const button_config_t bsp_button_config[BSP_BUTTON_NUM] = {
     {
@@ -136,28 +119,61 @@ esp_err_t bsp_iot_button_create(button_handle_t btn_array[], int *btn_cnt, int b
     return ret;
 }
 
-esp_err_t bsp_led_init()
-{
-    ESP_LOGI(TAG, "BLINK_GPIO setting %d", bsp_strip_config.strip_gpio_num);
+static const led_strip_config_t bsp_leds_rgb_strip_config = {
+    .strip_gpio_num = BSP_LED_RGB_GPIO,   // The GPIO that connected to the LED strip's data line
+    .max_leds = BSP_LED_NUM,                  // The number of LEDs in the strip,
+    .led_pixel_format = LED_PIXEL_FORMAT_GRB, // Pixel format of your LED strip
+    .led_model = LED_MODEL_WS2812,            // LED strip model
+    .flags.invert_out = false,                // whether to invert the output signal
+};
 
-    ESP_ERROR_CHECK(led_strip_new_rmt_device(&bsp_strip_config, &bsp_rmt_config, &led_strip));
-    for (uint32_t index = 0; index < BSP_RGB_LEDS_NUM; ++index) {
-        led_strip_set_pixel(led_strip, index, 0x00, 0x00, 0x00);
+static const led_strip_rmt_config_t bsp_leds_rgb_rmt_config = {
+#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 0, 0)
+    .rmt_channel = 0,
+#else
+    .clk_src = RMT_CLK_SRC_DEFAULT,        // different clock source can lead to different power consumption
+    .resolution_hz = 10 * 1000 * 1000,     // RMT counter clock frequency = 10MHz
+    .flags.with_dma = false,               // DMA feature is available on ESP target like ESP32-S3
+#endif
+};
+
+static led_indicator_strips_config_t bsp_leds_rgb_config = {
+    .is_active_level_high = 1,
+    .led_strip_cfg = bsp_leds_rgb_strip_config,
+    .led_strip_driver = LED_STRIP_RMT,
+    .led_strip_rmt_cfg = bsp_leds_rgb_rmt_config,
+};
+
+static const led_indicator_config_t bsp_leds_config[1] = {
+    {
+        .mode = LED_STRIPS_MODE,
+        .led_indicator_strips_config = &bsp_leds_rgb_config,
+        .blink_lists = bsp_led_blink_defaults_lists,
+        .blink_list_num = BSP_LED_MAX,
     }
-    led_strip_refresh(led_strip);
+};
 
-    return ESP_OK;
-}
-
-esp_err_t bsp_led_rgb_set(uint8_t r, uint8_t g, uint8_t b)
+esp_err_t bsp_led_indicator_create(led_indicator_handle_t led_array[], int *led_cnt, int led_array_size)
 {
     esp_err_t ret = ESP_OK;
-
-    for (uint32_t index = 0; index < BSP_RGB_LEDS_NUM; ++index) {
-        ret |= led_strip_set_pixel(led_strip, index, r, g, b);
+    if ((led_array_size > BSP_LED_NUM) ||
+            (led_array == NULL)) {
+        return ESP_ERR_INVALID_ARG;
     }
 
-    ret |= led_strip_refresh(led_strip);
+    if (led_cnt) {
+        *led_cnt = 0;
+    }
+    // for (int i = 0; i < led_array_size; i++) {
+    led_array[0] = led_indicator_create(&bsp_leds_config[0]);
+    if (led_array[0] == NULL) {
+        ret = ESP_FAIL;
+        // break;
+    }
+    if (led_cnt) {
+        (*led_cnt)++;
+    }
+    // }
     return ret;
 }
 

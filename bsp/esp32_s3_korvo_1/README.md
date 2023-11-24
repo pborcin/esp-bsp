@@ -4,7 +4,7 @@
 
 * [Hardware Reference](https://github.com/espressif/esp-skainet/blob/master/docs/en/hw-reference/esp32s3/user-guide-korvo-1.md)
 
-![image](pic.png)
+![image](https://github.com/espressif/esp-bsp/tree/master/bsp/esp32_s3_korvo_1/pic.png)
 
 ESP32-S3-Korvo-1 is a development kit that is based on Espressif’s ESP32-S3 SoC. It features a three-microphone array which is suitable for far-field voice pick-up with low power consumption.
 

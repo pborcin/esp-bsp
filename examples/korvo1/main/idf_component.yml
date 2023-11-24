@@ -1,0 +1,6 @@
+description: korvo1
+
+dependencies:
+  esp32_s3_korvo_1:
+    version: "*"
+    override_path: "../../../bsp/esp32_s3_korvo_1"

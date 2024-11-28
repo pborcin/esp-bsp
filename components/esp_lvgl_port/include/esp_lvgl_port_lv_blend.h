@@ -32,6 +32,10 @@ extern "C" {
     _lv_color_blend_to_rgb565_esp(dsc)
 #endif
 
+#ifndef LV_DRAW_SW_COLOR_BLEND_TO_RGB888
+#define LV_DRAW_SW_COLOR_BLEND_TO_RGB888(dsc) \
+    _lv_color_blend_to_rgb888_esp(dsc)
+#endif
 
 /**********************
  *      TYPEDEFS
@@ -81,6 +85,21 @@ static inline lv_result_t _lv_color_blend_to_rgb565_esp(_lv_draw_sw_blend_fill_d
     };
 
     return lv_color_blend_to_rgb565_esp(&asm_dsc);
+}
+
+extern int lv_color_blend_to_rgb888_esp(asm_dsc_t *asm_dsc);
+
+static inline lv_result_t _lv_color_blend_to_rgb888_esp(_lv_draw_sw_blend_fill_dsc_t *dsc)
+{
+    asm_dsc_t asm_dsc = {
+        .dst_buf = dsc->dest_buf,
+        .dst_w = dsc->dest_w,
+        .dst_h = dsc->dest_h,
+        .dst_stride = dsc->dest_stride,
+        .src_buf = &dsc->color,
+    };
+
+    return lv_color_blend_to_rgb888_esp(&asm_dsc);
 }
 
 #endif // CONFIG_LV_DRAW_SW_ASM_CUSTOM

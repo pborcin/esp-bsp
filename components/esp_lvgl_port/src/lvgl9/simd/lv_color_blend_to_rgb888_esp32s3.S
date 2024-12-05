@@ -11,7 +11,7 @@
     .global lv_color_blend_to_rgb888_esp
     .type   lv_color_blend_to_rgb888_esp,@function
 // The function implements the following C code:
-// void lv_color_blend_to_rgb888(_lv_draw_sw_blend_fill_dsc_t * dsc, uint32_t dest_px_size);
+// void lv_color_blend_to_rgb888(_lv_draw_sw_blend_fill_dsc_t * dsc);
 
 // Input params
 //
@@ -28,13 +28,11 @@
 //     const lv_opa_t * mask_buf;   l32i    28
 //     uint32_t mask_stride;        l32i    32
 // } asm_dsc_t;
-// uint32_t dest_px_size - a3
 
 lv_color_blend_to_rgb888_esp:
 
     entry   a1,    32
 
-    mov.n    a12,   a3                          // a3 - dest_px_size, move to a13
     l32i.n   a3,    a2,    4                    // a3 - dest_buff
     l32i.n   a4,    a2,    8                    // a4 - dest_w                in uint24_t
     l32i.n   a5,    a2,    12                   // a5 - dest_h                in uint16_t

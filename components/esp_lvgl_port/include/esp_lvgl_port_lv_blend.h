@@ -33,8 +33,8 @@ extern "C" {
 #endif
 
 #ifndef LV_DRAW_SW_COLOR_BLEND_TO_RGB888
-#define LV_DRAW_SW_COLOR_BLEND_TO_RGB888(dsc, dest_px_size) \
-    _lv_color_blend_to_rgb888_esp(dsc, dest_px_size)
+#define LV_DRAW_SW_COLOR_BLEND_TO_RGB888(dsc) \
+    _lv_color_blend_to_rgb888_esp(dsc)
 #endif
 
 /**********************
@@ -87,9 +87,9 @@ static inline lv_result_t _lv_color_blend_to_rgb565_esp(_lv_draw_sw_blend_fill_d
     return lv_color_blend_to_rgb565_esp(&asm_dsc);
 }
 
-extern int lv_color_blend_to_rgb888_esp(asm_dsc_t *asm_dsc, uint32_t dest_px_size);
+extern int lv_color_blend_to_rgb888_esp(asm_dsc_t *asm_dsc);
 
-static inline lv_result_t _lv_color_blend_to_rgb888_esp(_lv_draw_sw_blend_fill_dsc_t *dsc, uint32_t dest_px_size)
+static inline lv_result_t _lv_color_blend_to_rgb888_esp(_lv_draw_sw_blend_fill_dsc_t *dsc)
 {
     asm_dsc_t asm_dsc = {
         .dst_buf = dsc->dest_buf,
@@ -99,7 +99,7 @@ static inline lv_result_t _lv_color_blend_to_rgb888_esp(_lv_draw_sw_blend_fill_d
         .src_buf = &dsc->color,
     };
 
-    return lv_color_blend_to_rgb888_esp(&asm_dsc, dest_px_size);
+    return lv_color_blend_to_rgb888_esp(&asm_dsc);
 }
 
 #endif // CONFIG_LV_DRAW_SW_ASM_CUSTOM

@@ -197,8 +197,8 @@ void LV_ATTRIBUTE_FAST_MEM lv_draw_sw_blend_color_to_rgb888(_lv_draw_sw_blend_fi
 
     /*Simple fill*/
     if (mask == NULL && opa >= LV_OPA_MAX) {
-        if (dsc->use_asm) {
-            LV_DRAW_SW_COLOR_BLEND_TO_RGB888(dsc, dest_px_size);
+        if (dsc->use_asm && dest_px_size == 3) {
+            LV_DRAW_SW_COLOR_BLEND_TO_RGB888(dsc);
         } else {
             if (dest_px_size == 3) {
                 uint8_t *dest_buf_u8 = dsc->dest_buf;

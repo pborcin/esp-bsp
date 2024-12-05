@@ -13,17 +13,18 @@
 #include "lv_draw_sw_blend.h"
 #include "lv_draw_sw_blend_to_argb8888.h"
 #include "lv_draw_sw_blend_to_rgb565.h"
+#include "lv_draw_sw_blend_to_rgb888.h"
 
 // ------------------------------------------------- Defines -----------------------------------------------------------
 
 #define DBG_PRINT_OUTPUT false
-#define CANARY_BYTES 4
+#define CANARY_BYTES 16
 
 // ------------------------------------------------- Macros and Types --------------------------------------------------
 
 #define UPDATE_TEST_CASE(test_case_ptr, dest_w, dest_h, dest_stride, unalign_byte) ({       \
     (test_case_ptr)->active_buf_len = (size_t)(dest_h * dest_stride);                       \
-    (test_case_ptr)->total_buf_len = (size_t)((dest_h * dest_stride) + (CANARY_BYTES * 2)); \
+    (test_case_ptr)->total_buf_len = (size_t)((dest_h * dest_stride * (test_case_ptr)->data_type_size) + (2 * CANARY_BYTES)); \
     (test_case_ptr)->dest_w = (dest_w);             \
     (test_case_ptr)->dest_h = (dest_h);             \
     (test_case_ptr)->dest_stride = (dest_stride);   \
@@ -80,6 +81,13 @@ static void test_eval_32bit_data(func_test_case_params_t *test_case);
  * @param[in] test_case Pointer ot structure defining functionality test case
  */
 static void test_eval_16bit_data(func_test_case_params_t *test_case);
+
+/**
+ * @brief Evaluate results for 24bit data length
+ *
+ * @param[in] test_case Pointer ot structure defining functionality test case
+ */
+static void test_eval_24bit_data(func_test_case_params_t *test_case);
 
 // ------------------------------------------------ Test cases ---------------------------------------------------------
 
@@ -147,10 +155,38 @@ TEST_CASE("Test fill functionality RGB565", "[fill][functionality][RGB565]")
     functionality_test_matrix(&test_matrix, &test_case);
 }
 
+TEST_CASE("Test fill functionality RGB888", "[fill][functionality][RGB888]")
+{
+    test_matrix_params_t test_matrix = {
+        .min_w = 8,             // 8 is the lower limit for the esp32s3 asm implementation, otherwise esp32 is executed
+        .min_h = 1,
+        .max_w = 16,
+        .max_h = 16,
+        .min_unalign_byte = 0,
+        .max_unalign_byte = 16,
+        .unalign_step = 1,
+        .dest_stride_step = 1,
+        .test_combinations_count = 0,
+    };
+
+    func_test_case_params_t test_case = {
+        .blend_api_px_func = &lv_draw_sw_blend_color_to_rgb888,
+        .color_format = LV_COLOR_FORMAT_RGB888,
+        .data_type_size = 3,
+    };
+
+    ESP_LOGI(TAG_LV_FILL_FUNC, "running test for RGB888 color format");
+    functionality_test_matrix(&test_matrix, &test_case);
+}
 // ------------------------------------------------ Static test functions ----------------------------------------------
 
 static void functionality_test_matrix(test_matrix_params_t *test_matrix, func_test_case_params_t *test_case)
 {
+    int dest_w = 16, dest_h = 1, dest_stride = 16, unalign_byte = 0;
+    UPDATE_TEST_CASE(test_case, dest_w, dest_h, dest_stride, unalign_byte);
+    lv_fill_functionality(test_case);
+    test_matrix->test_combinations_count++;
+    return ;
     // Step destination array width
     for (int dest_w = test_matrix->min_w; dest_w <= test_matrix->max_w; dest_w++) {
 
@@ -195,12 +231,17 @@ static void lv_fill_functionality(func_test_case_params_t *test_case)
     dsc_ansi.dest_buf = test_case->buf.p_ansi;
     dsc_ansi.use_asm = false;
 
-    test_case->blend_api_func(&dsc_asm);    // Call the LVGL API with Assembly code
-    test_case->blend_api_func(&dsc_ansi);   // Call the LVGL API with ANSI code
+    if (test_case->blend_api_func != NULL) {
+        test_case->blend_api_func(&dsc_asm);    // Call the LVGL API with Assembly code
+        test_case->blend_api_func(&dsc_ansi);   // Call the LVGL API with ANSI code
+    } else if (test_case->blend_api_px_func != NULL) {
+        test_case->blend_api_px_func(&dsc_asm, 3);    // Call the LVGL API with Assembly code
+        test_case->blend_api_px_func(&dsc_ansi, 3);   // Call the LVGL API with ANSI code
+    }
 
     // Shift array pointers by Canary Bytes amount back
-    test_case->buf.p_asm -= CANARY_BYTES * test_case->data_type_size;
-    test_case->buf.p_ansi -= CANARY_BYTES * test_case->data_type_size;
+    test_case->buf.p_asm -= CANARY_BYTES;
+    test_case->buf.p_ansi -= CANARY_BYTES;
 
     // Evaluate the results
     sprintf(test_msg_buf, "Test case: dest_w = %d, dest_h = %d, dest_stride = %d, unalign_byte = %d\n", test_case->dest_w, test_case->dest_h, test_case->dest_stride, test_case->unalign_byte);
@@ -213,6 +254,11 @@ static void lv_fill_functionality(func_test_case_params_t *test_case)
 
     case LV_COLOR_FORMAT_RGB565: {
         test_eval_16bit_data(test_case);
+        break;
+    }
+
+    case LV_COLOR_FORMAT_RGB888: {
+        test_eval_24bit_data(test_case);
         break;
     }
 
@@ -233,8 +279,9 @@ static void fill_test_bufs(func_test_case_params_t *test_case)
     const unsigned int unalign_byte = test_case->unalign_byte;
 
     // Allocate destination arrays for Assembly and ANSI LVGL Blend API
-    void *mem_asm   = memalign(16, (total_buf_len * data_type_size) + unalign_byte);
-    void *mem_ansi  = memalign(16, (total_buf_len * data_type_size) + unalign_byte);
+
+    void *mem_asm   = memalign(16, total_buf_len + unalign_byte);
+    void *mem_ansi  = memalign(16, total_buf_len + unalign_byte);
     TEST_ASSERT_NOT_NULL_MESSAGE(mem_asm, "Lack of memory");
     TEST_ASSERT_NOT_NULL_MESSAGE(mem_ansi, "Lack of memory");
 
@@ -247,19 +294,21 @@ static void fill_test_bufs(func_test_case_params_t *test_case)
     uint8_t *dest_buf_ansi = (uint8_t *)mem_ansi + unalign_byte;
 
     // Set the whole buffer to 0, including the Canary bytes part
-    memset(dest_buf_asm, 0, total_buf_len * data_type_size);
-    memset(dest_buf_ansi, 0, total_buf_len * data_type_size);
+    // memset(dest_buf_asm, 0, total_buf_len * data_type_size);
+    memset(dest_buf_asm, 0, total_buf_len);
+    // memset(dest_buf_ansi, 0, total_buf_len * data_type_size);
+    memset(dest_buf_ansi, 0, total_buf_len);
 
     // Fill the actual part of the destination buffers with known values,
     // Values must be same, because of the stride
-    for (int i = CANARY_BYTES; i < active_buf_len + CANARY_BYTES; i++) {
-        dest_buf_asm[i * data_type_size] = (uint8_t)(i % 255);
-        dest_buf_ansi[i * data_type_size] = (uint8_t)(i % 255);
+    for (int i = 0; i < active_buf_len; i++) {
+        dest_buf_asm[i * data_type_size + CANARY_BYTES] = (uint8_t)(i % 255);
+        dest_buf_ansi[i * data_type_size + CANARY_BYTES] = (uint8_t)(i % 255);
     }
 
     // Shift array pointers by Canary Bytes amount
-    dest_buf_asm += CANARY_BYTES * data_type_size;
-    dest_buf_ansi += CANARY_BYTES * data_type_size;
+    dest_buf_asm += CANARY_BYTES;
+    dest_buf_ansi += CANARY_BYTES;
 
     // Save a pointer to the working part of the memory, where the test data are stored
     test_case->buf.p_asm = (void *)dest_buf_asm;
@@ -270,42 +319,103 @@ static void test_eval_32bit_data(func_test_case_params_t *test_case)
 {
     // Print results 32bit data
 #if DBG_PRINT_OUTPUT
-    for (uint32_t i = 0; i < test_case->total_buf_len; i++) {
-        printf("dest_buf[%"PRIi32"] %s ansi = %8"PRIx32" \t asm = %8"PRIx32" \n", i, ((i < 10) ? (" ") : ("")), ((uint32_t *)test_case->buf.p_ansi)[i], ((uint32_t *)test_case->buf.p_asm)[i]);
+    // Print CANARY_BYTES
+    for (uint32_t i = 0; i < CANARY_BYTES; i++) {
+        printf("dest_buf[%"PRIi32"] %s ansi = %8"PRIx8" \t asm = %8"PRIx8" \n", i, ((i < 10) ? (" ") : ("")), ((uint8_t *)test_case->buf.p_ansi)[i], ((uint8_t *)test_case->buf.p_asm)[i]);
+    }
+    // Print values
+    for (uint32_t i = 0; i < test_case->active_buf_len; i++) {
+        uint32_t j = i + CANARY_BYTES / test_case->data_type_size;
+        printf("dest_buf[%"PRIi32"] %s ansi = %8"PRIx32" \t asm = %8"PRIx32" \n", i, ((i < 10) ? (" ") : ("")), ((uint32_t *)test_case->buf.p_ansi)[j], ((uint32_t *)test_case->buf.p_asm)[j]);
+    }
+    // Print CANARY_BYTES
+    for (uint32_t i = 0; i < CANARY_BYTES; i++) {
+        uint32_t j = i + test_case->active_buf_len * test_case->data_type_size + CANARY_BYTES;
+        printf("dest_buf[%"PRIi32"] %s ansi = %8"PRIx8" \t asm = %8"PRIx8" \n", i, ((i < 10) ? (" ") : ("")), ((uint8_t *)test_case->buf.p_ansi)[j], ((uint8_t *)test_case->buf.p_asm)[j]);
     }
     printf("\n");
 #endif
 
     // Canary bytes area must stay 0
-    TEST_ASSERT_EACH_EQUAL_UINT32_MESSAGE(0, (uint32_t *)test_case->buf.p_ansi, CANARY_BYTES, test_msg_buf);
-    TEST_ASSERT_EACH_EQUAL_UINT32_MESSAGE(0, (uint32_t *)test_case->buf.p_asm, CANARY_BYTES, test_msg_buf);
+    TEST_ASSERT_EACH_EQUAL_UINT8_MESSAGE(0, (uint8_t *)test_case->buf.p_ansi, CANARY_BYTES, test_msg_buf);
+    TEST_ASSERT_EACH_EQUAL_UINT8_MESSAGE(0, (uint8_t *)test_case->buf.p_asm, CANARY_BYTES, test_msg_buf);
 
     // dest_buf_asm and dest_buf_ansi must be equal
-    TEST_ASSERT_EQUAL_UINT32_ARRAY_MESSAGE((uint32_t *)test_case->buf.p_asm + CANARY_BYTES, (uint32_t *)test_case->buf.p_ansi + CANARY_BYTES, test_case->active_buf_len, test_msg_buf);
+    TEST_ASSERT_EQUAL_UINT32_ARRAY_MESSAGE((uint32_t *)test_case->buf.p_asm + 4, (uint32_t *)test_case->buf.p_ansi + 4, test_case->active_buf_len, test_msg_buf);
 
     // Canary bytes area must stay 0
-    TEST_ASSERT_EACH_EQUAL_UINT32_MESSAGE(0, (uint32_t *)test_case->buf.p_ansi + (test_case->total_buf_len - CANARY_BYTES), CANARY_BYTES, test_msg_buf);
-    TEST_ASSERT_EACH_EQUAL_UINT32_MESSAGE(0, (uint32_t *)test_case->buf.p_asm + (test_case->total_buf_len - CANARY_BYTES), CANARY_BYTES, test_msg_buf);
+    TEST_ASSERT_EACH_EQUAL_UINT8_MESSAGE(0, (uint8_t *)test_case->buf.p_ansi + test_case->active_buf_len * 4 + CANARY_BYTES, CANARY_BYTES, test_msg_buf);
+    TEST_ASSERT_EACH_EQUAL_UINT8_MESSAGE(0, (uint8_t *)test_case->buf.p_asm + test_case->active_buf_len * 4 + CANARY_BYTES, CANARY_BYTES, test_msg_buf);
 }
 
 static void test_eval_16bit_data(func_test_case_params_t *test_case)
 {
     // Print results, 16bit data
 #if DBG_PRINT_OUTPUT
-    for (uint32_t i = 0; i < test_case->total_buf_len; i++) {
-        printf("dest_buf[%"PRIi32"] %s ansi = %8"PRIx16" \t asm = %8"PRIx16" \n", i, ((i < 10) ? (" ") : ("")), ((uint16_t *)test_case->buf.p_ansi)[i], ((uint16_t *)test_case->buf.p_asm)[i]);
+    // Print CANARY_BYTES
+    for (uint32_t i = 0; i < CANARY_BYTES; i++) {
+        printf("dest_buf[%"PRIi32"] %s ansi = %8"PRIx8" \t asm = %8"PRIx8" \n", i, ((i < 10) ? (" ") : ("")), ((uint8_t *)test_case->buf.p_ansi)[i], ((uint8_t *)test_case->buf.p_asm)[i]);
+    }
+    // Print values
+    for (uint32_t i = 0; i < test_case->active_buf_len; i++) {
+        uint32_t j = i + CANARY_BYTES / test_case->data_type_size;
+        printf("dest_buf[%"PRIi32"] %s ansi = %8"PRIx16" \t asm = %8"PRIx16" \n", i, ((i < 10) ? (" ") : ("")), ((uint16_t *)test_case->buf.p_ansi)[j], ((uint16_t *)test_case->buf.p_asm)[j]);
+    }
+    // Print CANARY_BYTES
+    for (uint32_t i = 0; i < CANARY_BYTES; i++) {
+        uint32_t j = i + test_case->active_buf_len * test_case->data_type_size + CANARY_BYTES;
+        printf("dest_buf[%"PRIi32"] %s ansi = %8"PRIx8" \t asm = %8"PRIx8" \n", i, ((i < 10) ? (" ") : ("")), ((uint8_t *)test_case->buf.p_ansi)[j], ((uint8_t *)test_case->buf.p_asm)[j]);
     }
     printf("\n");
 #endif
 
     // Canary bytes area must stay 0
-    TEST_ASSERT_EACH_EQUAL_UINT16_MESSAGE(0, (uint16_t *)test_case->buf.p_ansi, CANARY_BYTES, test_msg_buf);
-    TEST_ASSERT_EACH_EQUAL_UINT16_MESSAGE(0, (uint16_t *)test_case->buf.p_asm, CANARY_BYTES, test_msg_buf);
+    TEST_ASSERT_EACH_EQUAL_UINT8_MESSAGE(0, (uint8_t *)test_case->buf.p_ansi, CANARY_BYTES, test_msg_buf);
+    TEST_ASSERT_EACH_EQUAL_UINT8_MESSAGE(0, (uint8_t *)test_case->buf.p_asm, CANARY_BYTES, test_msg_buf);
 
     // dest_buf_asm and dest_buf_ansi must be equal
-    TEST_ASSERT_EQUAL_UINT16_ARRAY_MESSAGE((uint16_t *)test_case->buf.p_asm + CANARY_BYTES, (uint16_t *)test_case->buf.p_ansi + CANARY_BYTES, test_case->active_buf_len, test_msg_buf);
+    TEST_ASSERT_EQUAL_UINT16_ARRAY_MESSAGE((uint16_t *)test_case->buf.p_asm + 8, (uint16_t *)test_case->buf.p_ansi + 8, test_case->active_buf_len, test_msg_buf);
 
     // Canary bytes area must stay 0
-    TEST_ASSERT_EACH_EQUAL_UINT16_MESSAGE(0, (uint16_t *)test_case->buf.p_ansi + (test_case->total_buf_len - CANARY_BYTES), CANARY_BYTES, test_msg_buf);
-    TEST_ASSERT_EACH_EQUAL_UINT16_MESSAGE(0, (uint16_t *)test_case->buf.p_asm + (test_case->total_buf_len - CANARY_BYTES), CANARY_BYTES, test_msg_buf);
+    TEST_ASSERT_EACH_EQUAL_UINT8_MESSAGE(0, (uint8_t *)test_case->buf.p_ansi + test_case->active_buf_len * 2 + CANARY_BYTES, CANARY_BYTES, test_msg_buf);
+    TEST_ASSERT_EACH_EQUAL_UINT8_MESSAGE(0, (uint8_t *)test_case->buf.p_asm + test_case->active_buf_len * 2 + CANARY_BYTES, CANARY_BYTES, test_msg_buf);
+}
+
+static void test_eval_24bit_data(func_test_case_params_t *test_case)
+{
+    // Print results, 24bit data
+#if DBG_PRINT_OUTPUT
+    // Print CANARY_BYTES
+    for (uint32_t i = 0; i < CANARY_BYTES; i++) {
+        printf("dest_buf[%"PRIi32"] %s ansi = %8"PRIx8" \t asm = %8"PRIx8" \n", i, ((i < 10) ? (" ") : ("")), ((uint8_t *)test_case->buf.p_ansi)[i], ((uint8_t *)test_case->buf.p_asm)[i]);
+    }
+    // Print values
+    for (uint32_t i = 0; i < test_case->active_buf_len; i++) {
+        uint32_t j = i * test_case->data_type_size + CANARY_BYTES;
+        uint32_t ansi_value = ((uint8_t *)test_case->buf.p_ansi)[j]
+                              | (((uint8_t *)test_case->buf.p_ansi)[j + 1] << 8)
+                              | (((uint8_t *)test_case->buf.p_ansi)[j + 2] << 16);
+        uint32_t asm_value  = ((uint8_t *)test_case->buf.p_asm)[j]
+                              | (((uint8_t *)test_case->buf.p_asm)[j + 1] << 8)
+                              | (((uint8_t *)test_case->buf.p_asm)[j + 2] << 16);
+        printf("dest_buf[%"PRIi32"] %s ansi = %8"PRIx32" \t asm = %8"PRIx32" \n", i, ((i < 10) ? (" ") : ("")), ansi_value, asm_value);
+    }
+    // Print CANARY_BYTES
+    for (uint32_t i = 0; i < CANARY_BYTES; i++) {
+        uint32_t j = i + test_case->active_buf_len * 3 + CANARY_BYTES;
+        printf("dest_buf[%"PRIi32"] %s ansi = %8"PRIx8" \t asm = %8"PRIx8" \n", i, ((i < 10) ? (" ") : ("")), ((uint8_t *)test_case->buf.p_ansi)[j], ((uint8_t *)test_case->buf.p_asm)[j]);
+    }
+    printf("\n");
+#endif
+
+    // Canary bytes area must stay 0
+    TEST_ASSERT_EACH_EQUAL_UINT8_MESSAGE(0, (uint8_t *)test_case->buf.p_ansi, CANARY_BYTES, test_msg_buf);
+    TEST_ASSERT_EACH_EQUAL_UINT8_MESSAGE(0, (uint8_t *)test_case->buf.p_asm, CANARY_BYTES, test_msg_buf);
+
+    // dest_buf_asm and dest_buf_ansi must be equal
+    TEST_ASSERT_EQUAL_UINT8_ARRAY_MESSAGE((uint8_t *)test_case->buf.p_asm + CANARY_BYTES, (uint8_t *)test_case->buf.p_ansi + CANARY_BYTES, test_case->active_buf_len * 3, test_msg_buf);
+
+    // Canary bytes area must stay 0
+    TEST_ASSERT_EACH_EQUAL_UINT8_MESSAGE(0, (uint8_t *)test_case->buf.p_ansi + test_case->active_buf_len * 3 + CANARY_BYTES, CANARY_BYTES, test_msg_buf);
+    TEST_ASSERT_EACH_EQUAL_UINT8_MESSAGE(0, (uint8_t *)test_case->buf.p_asm + test_case->active_buf_len * 3 + CANARY_BYTES, CANARY_BYTES, test_msg_buf);
 }

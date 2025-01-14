@@ -12,6 +12,8 @@ Assembly source files could be found in the [`lvgl_port`](../../src/lvgl9/simd/)
 |              | 127x127     |      1 byte      |     0.488      |     1.597      |
 | RGB565       | 128x128     |     16 byte      |     0.196      |     1.146      |
 |              | 127x127     |      1 byte      |     0.497      |     1.124      |
+| RGB888       | 128x128     |     16 byte      |     0.608      |     2.247      |
+|              | 127x127     |      1 byte      |     0.826      |     2.413      |
 * this data was obtained by running [benchmark tests](#benchmark-test) on 128x128 16 byte aligned matrix (ideal case) and 127x127 1 byte aligned matrix (worst case)
 * the values represent cycles per sample to perform simple fill of the matrix on esp32s3
 
@@ -118,3 +120,4 @@ Example of an best and corner case input parameters for benchmark test, for a co
 | :----------------- | :--------------- | :------------- | :------------- | :------------- |
 | Best case          | 16-byte aligned  | Multiple of 8  | Multiple of 8  | Multiple of 8  |
 | Corner case        | 1-byte aligned   | Not power of 2 | Not power of 2 | Not power of 2 |
+
